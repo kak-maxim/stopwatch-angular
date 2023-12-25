@@ -1,63 +1,76 @@
-import { Component, OnInit } from '@angular/core';
-import { BehaviorSubject, interval, Subject, timer } from 'rxjs';
-import { takeUntil, tap } from 'rxjs/operators';
-import { DatePipe } from '@angular/common';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { timer, BehaviorSubject, Subject, fromEvent } from 'rxjs';
+import { takeUntil, map, withLatestFrom, filter, exhaustMap, debounceTime, buffer } from 'rxjs/operators';
 
 @Component({
   selector: 'app-stopwatch',
   templateUrl: './stopwatch.component.html',
-  styleUrls: ['./stopwatch.component.scss'],
-  providers: [DatePipe]
+  styleUrls: ['./stopwatch.component.scss']
 })
-  
 export class StopwatchComponent implements OnInit {
-  $isRunning = new BehaviorSubject<boolean>(false);
-  private resetTimer = new Subject<void>();
-  private waitEvent = new Subject<void>();
-  private doubleClickTimer = timer(300);
-  private doubleClicks = 0;
-  time = '00:00:00';
-  private startTime = new Date(0);
 
-  constructor(private datePipe: DatePipe) {
+  public seconds$ = new BehaviorSubject<number>(0);
+  private waitClicks = 0;
+  private lastClickTime = 0;
+  private onStop$ = new Subject<void>();
+  private onStart$ = new Subject<void>();
+
+  @ViewChild('onWait', { static: true })
+  waitButton!: ElementRef;
+
+  ngOnInit(): void {
+    this.initTimer();
+    this.handleWaitButton();  
   }
 
-  ngOnInit() {
-    interval(1000).pipe(
-      tap(() => {
-        if (this.$isRunning.value) {
-          this.startTime.setSeconds(this.startTime.getSeconds() + 1);
-          const transformedTime = this.datePipe.transform(this.startTime, 'HH:mm:ss', 'UTC');
-          this.time = transformedTime ?? this.time;
-        }
-      }),
-      takeUntil(this.resetTimer)
-    ).subscribe();
-  }
-
-  startStop() {
-    if (!this.$isRunning.value) {
-      this.$isRunning.next(true);
-    } else {
-      this.$isRunning.next(false);
-    }
-  }
-
-  wait() {
-    this.doubleClicks++;
-    this.doubleClickTimer.subscribe(() => {
-      if (this.doubleClicks === 2) {
-        this.$isRunning.next(false);
-      }
-      this.doubleClicks = 0;
+  private handleWaitButton(): void {
+    const click$ = fromEvent(this.waitButton.nativeElement, 'click');
+  
+    click$.pipe(
+      buffer(click$.pipe(debounceTime(300))),
+      map(clickArray => clickArray.length),
+      filter(clickCount => clickCount === 2)
+    ).subscribe(() => {
+      this.onStop$.next();
     });
   }
 
-  reset() {
-    this.$isRunning.next(false);
-    this.startTime = new Date(0);
-    const transformedTime = this.datePipe.transform(this.startTime, 'HH:mm:ss', 'UTC');
-    this.time = transformedTime ?? this.time;
-    this.resetTimer.next();
+  public onStart(): void {
+    this.onStart$.next();
+  }
+
+  public onStop(): void {
+    this.onStop$.next();
+  }
+
+  public onWaitClick(): void {
+    const now = Date.now();
+    if (now - this.lastClickTime < 300) {
+      this.waitClicks++;
+      if (this.waitClicks === 2) {
+        this.onStop$.next();
+        this.waitClicks = 0;
+      }
+    } else {
+      this.waitClicks = 1;
+    }
+    this.lastClickTime = now;
+  }
+
+  public onReset(): void {
+    this.onStop$.next();
+    this.seconds$.next(0);
+  }
+
+  private initTimer(): void {
+    this.onStart$
+      .pipe(
+        withLatestFrom(this.seconds$),
+        exhaustMap(([, lastTime]) => timer(0, 1000).pipe(
+          map(v => v + lastTime),
+          takeUntil(this.onStop$)
+        ))
+      )
+      .subscribe(v => this.seconds$.next(v));
   }
 }
