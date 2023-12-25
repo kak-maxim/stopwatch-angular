@@ -16,14 +16,14 @@ export class StopwatchComponent implements OnInit, OnDestroy {
   private onStop$ = new Subject<void>();
   private onStart$ = new Subject<void>();
 
-  @ViewChild('onWait', { static: true })
   waitButton!: ElementRef;
+
+  constructor() {}
 
   ngOnInit(): void {
     this.initTimer();
     this.handleWaitButton();  
   }
-
 
   private handleWaitButton(): void {
     const click$ = fromEvent(this.waitButton.nativeElement, 'click');
@@ -67,15 +67,15 @@ export class StopwatchComponent implements OnInit, OnDestroy {
 
   private initTimer(): void {
     this.onStart$
-  .pipe(
-    withLatestFrom(this.seconds$),
-    exhaustMap(([, lastTime]) => timer(0, 1000).pipe(
-      map(v => v + lastTime),
-      takeUntil(this.onStop$)
-    )),
-    takeUntil(this.destroy$) 
-  )
-  .subscribe(v => this.seconds$.next(v));
+      .pipe(
+        withLatestFrom(this.seconds$),
+        exhaustMap(([, lastTime]) => timer(0, 1000).pipe(
+          map(elapsedSeconds => elapsedSeconds + lastTime),
+          takeUntil(this.onStop$)
+        )),
+        takeUntil(this.destroy$) 
+      )
+      .subscribe(updatedSeconds => this.seconds$.next(updatedSeconds));
   }
 
   ngOnDestroy(): void {

@@ -1,4 +1,5 @@
 <div class="stopwatch">
+  <!-- <p class="time">{{ ((seconds$ | async) ?? 0) * 1000 | date:'HH:mm:ss':'UTC' }}</p> -->
   <p class="time">{{ ((seconds$ | async) ?? 0) * 1000 | date:'HH:mm:ss':'UTC' }}</p>
   <div class="buttons">
     <button mat-raised-button color="primary" (click)="onStart()">Start</button>
