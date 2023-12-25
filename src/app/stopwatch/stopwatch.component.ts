@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, } from '@angular/core';
 import { timer, BehaviorSubject, Subject, fromEvent } from 'rxjs';
 import { takeUntil, map, withLatestFrom, filter, exhaustMap, debounceTime, buffer } from 'rxjs/operators';
 
@@ -7,9 +7,10 @@ import { takeUntil, map, withLatestFrom, filter, exhaustMap, debounceTime, buffe
   templateUrl: './stopwatch.component.html',
   styleUrls: ['./stopwatch.component.scss']
 })
-export class StopwatchComponent implements OnInit {
+export class StopwatchComponent implements OnInit, OnDestroy {
 
-  public seconds$ = new BehaviorSubject<number>(0);
+  seconds$ = new BehaviorSubject<number>(0);
+  private destroy$ = new Subject<void>();
   private waitClicks = 0;
   private lastClickTime = 0;
   private onStop$ = new Subject<void>();
@@ -23,13 +24,15 @@ export class StopwatchComponent implements OnInit {
     this.handleWaitButton();  
   }
 
+
   private handleWaitButton(): void {
     const click$ = fromEvent(this.waitButton.nativeElement, 'click');
   
     click$.pipe(
       buffer(click$.pipe(debounceTime(300))),
       map(clickArray => clickArray.length),
-      filter(clickCount => clickCount === 2)
+      filter(clickCount => clickCount === 2),
+      takeUntil(this.destroy$)
     ).subscribe(() => {
       this.onStop$.next();
     });
@@ -64,13 +67,19 @@ export class StopwatchComponent implements OnInit {
 
   private initTimer(): void {
     this.onStart$
-      .pipe(
-        withLatestFrom(this.seconds$),
-        exhaustMap(([, lastTime]) => timer(0, 1000).pipe(
-          map(v => v + lastTime),
-          takeUntil(this.onStop$)
-        ))
-      )
-      .subscribe(v => this.seconds$.next(v));
+  .pipe(
+    withLatestFrom(this.seconds$),
+    exhaustMap(([, lastTime]) => timer(0, 1000).pipe(
+      map(v => v + lastTime),
+      takeUntil(this.onStop$)
+    )),
+    takeUntil(this.destroy$) 
+  )
+  .subscribe(v => this.seconds$.next(v));
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }
