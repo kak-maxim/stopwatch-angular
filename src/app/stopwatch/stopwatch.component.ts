@@ -59,7 +59,7 @@ export class StopwatchComponent implements OnInit, OnDestroy {
       this.waitClicks++;
       if (this.waitClicks === 2) {
         this.onStop$.next();
-        this.isRunning$ = !this.isRunning$;
+        this.isRunning$ = false;
         this.waitClicks = 0;
       }
     } else {
