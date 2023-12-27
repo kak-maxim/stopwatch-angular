@@ -1,9 +1,9 @@
 <div class="stopwatch">
-  <!-- <p class="time">{{ ((seconds$ | async) ?? 0) * 1000 | date:'HH:mm:ss':'UTC' }}</p> -->
   <p class="time">{{ ((seconds$ | async) ?? 0) * 1000 | date:'HH:mm:ss':'UTC' }}</p>
   <div class="buttons">
-    <button mat-raised-button color="primary" (click)="onStart()">Start</button>
-    <button mat-raised-button color="primary" (click)="onStop()">Stop</button>
+    <button mat-raised-button color="primary" (click)="toggleTimer()">
+      {{ isRunning$ ? 'Stop' : 'Start' }}
+    </button>
     <button mat-raised-button color="primary" (click)="onWaitClick()">Wait</button>
     <button mat-raised-button color="primary" (click)="onReset()">Reset</button>
   </div>
