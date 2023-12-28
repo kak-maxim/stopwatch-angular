@@ -1,19 +1,14 @@
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  ViewChild,
-  ElementRef,
-} from '@angular/core';
-import { timer, BehaviorSubject, Subject, fromEvent } from 'rxjs';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { timer, BehaviorSubject, Subject } from 'rxjs';
 import {
   takeUntil,
   map,
   withLatestFrom,
-  filter,
   exhaustMap,
-  debounceTime,
   buffer,
+  debounceTime,
+  filter,
+  tap,
 } from 'rxjs/operators';
 
 @Component({
@@ -22,61 +17,53 @@ import {
   styleUrls: ['./stopwatch.component.scss'],
 })
 export class StopwatchComponent implements OnInit, OnDestroy {
-
-  isRunning$ = false;
+  isRunning$ = new BehaviorSubject<boolean>(false);
   seconds$ = new BehaviorSubject<number>(0);
   private destroy$ = new Subject<void>();
-  private waitClicks = 0;
-  private lastClickTime = 0;
-  private onStop$ = new Subject<void>();
-  private onStart$ = new Subject<void>();
-
-
-  constructor() {}
+  private toggleTimer$ = new Subject<boolean>();
+  private onWait$ = new Subject<void>();
 
   ngOnInit(): void {
     this.initTimer();
+    this.initWaitHandler();
+  }
+
+  private initWaitHandler(): void {
+    this.onWait$
+      .pipe(
+        buffer(this.onWait$.pipe(debounceTime(300))),
+        filter((clicks) => clicks.length === 2),
+        tap(() => this.toggleTimer$.next(false)),
+        takeUntil(this.destroy$)
+      )
+      .subscribe();
   }
 
   public toggleTimer(): void {
-    if (this.isRunning$) {
-      this.onStop$.next();
-    } else {
-      this.onStart$.next();
-    }
-    this.isRunning$ = !this.isRunning$;
+    this.toggleTimer$.next(!this.isRunning$.value);
   }
 
   public onReset(): void {
-    this.onStop$.next();
     this.seconds$.next(0);
-    this.isRunning$ = false;
+    this.toggleTimer$.next(false);
   }
 
   public onWaitClick(): void {
-    const now = Date.now();
-    if (now - this.lastClickTime < 300) {
-      this.waitClicks++;
-      if (this.waitClicks === 2) {
-        this.onStop$.next();
-        this.isRunning$ = false;
-        this.waitClicks = 0;
-      }
-    } else {
-      this.waitClicks = 1;
-    }
-    this.lastClickTime = now;
+    this.onWait$.next();
   }
 
   private initTimer(): void {
-    this.onStart$
+    this.toggleTimer$
       .pipe(
+        tap((isRunning) => this.isRunning$.next(isRunning)),
         withLatestFrom(this.seconds$),
-        exhaustMap(([, lastTime]) =>
-          timer(0, 1000).pipe(
-            map((elapsedSeconds) => elapsedSeconds + lastTime),
-            takeUntil(this.onStop$)
-          )
+        exhaustMap(([isRunning, lastTime]) =>
+          isRunning
+            ? timer(0, 1000).pipe(
+                map((elapsedSeconds) => elapsedSeconds + lastTime),
+                takeUntil(this.toggleTimer$.pipe(filter((run) => !run)))
+              )
+            : []
         ),
         takeUntil(this.destroy$)
       )

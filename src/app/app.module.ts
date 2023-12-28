@@ -14,7 +14,6 @@ import { StopwatchModule } from './stopwatch/stopwatch.module';
   imports: [
     BrowserModule,
     StopwatchModule,
-    AppRoutingModule,
     BrowserAnimationsModule,
   ],
   providers: [],
